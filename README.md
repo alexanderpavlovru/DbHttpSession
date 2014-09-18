@@ -37,3 +37,4 @@ Add this method to User model
         return $command->queryAll();
     }
 ```
+Wiki <http://www.yiiframework.com/wiki/751/check-users-online-user-last-activity-user-last-ip/>
