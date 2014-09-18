@@ -16,6 +16,12 @@
  * 'userTableName' => 'user'
  * ),
  *
+ * Session table will be created automatically
+ *
+ *
+ * Add columns to your user table:
+ * ALTER TABLE user ADD user_id INT(11) NOT NULL, ADD last_ip VARCHAR(100) NOT NULL, ADD last_activity DATETIME NOT NULL
+ *
  */
 class DbHttpSession extends CDbHttpSession
 {
@@ -48,14 +54,14 @@ class DbHttpSession extends CDbHttpSession
         try {
             $command = $db->createCommand("SELECT * FROM $this->sessionTableName WHERE expire<\"$time\"");
             $result = $command->queryAll();
-
             foreach ($result as $item) {
                 $id = $item["id"];
                 $user_id = $item["user_id"];
                 $last_activity = $item["last_activity"];
+                $last_ip = $item["last_ip"];
 
                 $cmdUpd = $db->createCommand(
-                    "UPDATE $this->userTableName SET last_activity=\"$last_activity\" WHERE id=$user_id"
+                    "UPDATE $this->userTableName SET last_activity=\"$last_activity\", last_ip=\"$last_ip\"  WHERE id=$user_id"
                 );
                 $cmdDel = $db->createCommand("DELETE FROM $this->sessionTableName WHERE id=\"$id\"");
                 $cmdDel->execute();
@@ -63,9 +69,17 @@ class DbHttpSession extends CDbHttpSession
             }
         } catch (Exception $e) {
             //TODO write log
+            $this->createSessionTable($db, $this->sessionTableName);
         }
     }
 
+    protected function createSessionTable($db, $tableName)
+    {
+        parent::createSessionTable($db, $tableName);
+        $db->createCommand()->addColumn($tableName, 'user_id', 'integer not null');
+        $db->createCommand()->addColumn($tableName, 'last_activity', 'datetime not null');
+        $db->createCommand()->addColumn($tableName, 'last_ip', 'string not null');
+    }
 
     public function openSession($savePath, $sessionName)
     {
@@ -98,7 +112,7 @@ class DbHttpSession extends CDbHttpSession
                         'expire'        => $expire,
                         'user_id'       => Yii::app()->getUser()->getId(),
                         'last_activity' => new CDbExpression('NOW()'),
-                        // 'ip'            => CHttpRequest::getUserHostAddress(),
+                        'last_ip'       => CHttpRequest::getUserHostAddress(),
                     )
                 );
             } else {
@@ -108,11 +122,12 @@ class DbHttpSession extends CDbHttpSession
                         'expire'        => $expire,
                         'user_id'       => Yii::app()->getUser()->getId(),
                         'last_activity' => new CDbExpression('NOW()'),
-                        // 'ip'            => CHttpRequest::getUserHostAddress(),
+                        'last_ip'       => CHttpRequest::getUserHostAddress(),
                     ), 'id=:id', array(':id' => $id)
                 );
             }
         } catch (Exception $e) {
+            $this->createSessionTable($db, $this->sessionTableName);
             if (YII_DEBUG) {
                 echo $e->getMessage();
             }
